@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+    		 <record model="ir.ui.view" id="mrprepairars_form_view">
+                <field name="name">mrp_reapiar.form</field>
+                <field name="model">mrp.repair</field>
+                <field name="type">form</field>
+                <field name="inherit_id" ref="mrp_repair.view_repair_order_form"/>
+                <field name="arch" type="xml">
+                    
+                        <field name="prodlot_id" position="replace">
+                        	<field name="production_id"/>
+                        </field>
+
+<!--                        <xpath expr="/form/notebook/page/field[@name='operations']/tree/field[@name='tax_id']" position="replace">
+                      
+                    </xpath>
+                     -->
+                     
+                       <xpath expr="/form/notebook/page/field[@name='operations']/tree" position="replace">
+                            <tree string="Operations" editable="bottom">
+                                <field name="type" on_change="onchange_operation_type(type,parent.guarantee_limit)"/>
+                                <field name="product_id" on_change="product_id_change(parent.pricelist_id,product_id,product_uom,product_uom_qty, parent.partner_id)"/>
+                                <field name='name'/>
+                                <field name="product_uom_qty" string="Qty"/>
+                                <field name="product_uom" string="UoM"/>
+                                <field name="costo_unit"/>
+                                <field name="costo_subtotal"/>
+                                <field name="price_unit"/>
+                                <field name="price_subtotal"/>                                                                
+                                <field name="location_id"/>
+                                <field name="location_dest_id"/>
+                                <field name="to_invoice"/>
+                                
+                            </tree>
+                      
+                    </xpath>
+                    
+                    
+                </field>
+            </record>
+</data>
+</openerp>
