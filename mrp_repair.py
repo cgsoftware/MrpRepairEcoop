@@ -66,7 +66,7 @@ mrp_repair()
 
 class ProductChangeMixin(object):
     def product_id_change(self, cr, uid, ids, pricelist, product, uom=False,
-                          product_uom_qty=0, partner_id=False, guarantee_limit=False):
+                          product_uom_qty=0, partner_id=False, guarantee_limit=False,parent_product=False):
         """ On change of product it sets product quantity, tax account, name,
         uom of product, unit price and price subtotal.
         @param pricelist: Pricelist of current record.
@@ -79,7 +79,7 @@ class ProductChangeMixin(object):
         """
         result = {}
         warning = {}
-
+        #import pdb;pdb.set_trace()
         if not product_uom_qty:
             product_uom_qty = 1
         result['product_uom_qty'] = product_uom_qty
@@ -112,7 +112,23 @@ class ProductChangeMixin(object):
                      }
                 else:
                     result.update({'price_unit': price, 'price_subtotal': price*product_uom_qty})
-
+            if parent_product:
+                #import pdb;pdb.set_trace()
+                cerca=[('product_id','=',parent_product)]
+                id_bom = self.pool.get('mrp.bom').search(cr,uid,cerca)
+                if id_bom:
+                    bom = self.pool.get('mrp.bom').browse(cr,uid,id_bom)[0]
+                    cerca=[('bom_id','=',id_bom[0]),('product_id','=',product)]
+                    id_line_bom = self.pool.get('mrp.bom.altern.comp').search(cr,uid,cerca)
+                    if id_line_bom:
+                        line_bom= self.pool.get('mrp.bom.altern.comp').browse(cr,uid,id_line_bom)[0]
+                        if line_bom:
+                            
+                            result.update({'product_uom_qty':line_bom.product_qty,'price_unit': price, 'price_subtotal': price*line_bom.product_qty,})
+                        else:
+                            line_bom= self.pool.get('mrp.bom.facoltativi.comp').browse(cr,uid,id_line_bom)[0]
+                            if line_bom:
+                                result.update({'product_uom_qty':line_bom.product_qty,'price_unit': price, 'price_subtotal': price*line_bom.product_qty,})                            
         return {'value': result, 'warning': warning}
 
 
@@ -133,7 +149,7 @@ class mrp_repair_line(osv.osv, ProductChangeMixin):
         for line in self.browse(cr, uid, ids, context=context):
             cur = line.repair_id.pricelist_id.currency_id
             res[line.id] = cur_obj.round(cr, uid, cur, line.costo_unit*line.product_uom_qty)
-        print "RES", res
+        print "RES ", res
         return res
     
     _columns ={
@@ -141,10 +157,61 @@ class mrp_repair_line(osv.osv, ProductChangeMixin):
                'costo_subtotal': fields.function(_cost_line, method=True, string='Costo Totale Riga',digits_compute= dp.get_precision('Account')),
                }
 
+    _defaults = {
+     'state': lambda *a: 'draft',
+     'product_uom_qty': 0,
+     'type':'add',
+     'to_invoice': False,
+    }
 
+
+    def default_get(self, cr, uid, fields, context=None):
+        #import pdb;pdb.set_trace()
+        data = super(mrp_repair_line, self).default_get(cr, uid, fields, context=context)
+        location_id = self.pool.get('stock.location').search(cr, uid, [('name','=','Stock Lequile')])[0]
+        location_dest_id = self.pool.get('stock.location').search(cr, uid, [('name','=','Production')])[0]
+        data['location_id']=location_id
+        data['location_dest_id']=location_dest_id
+        return data
+
+    def onchange_operation_type(self, cr, uid, ids, type, guarantee_limit):
         
-
-
-
+        #res = super(mrp_repair_line,self).onchange_operation_type(cr, uid, ids, type, guarantee_limit)
+        
+        #value={}
+        
+        #value = res.get('value')
+        
+        #import pdb;pdb.set_trace()
+        
+        location_id = self.pool.get('stock.location').search(cr, uid, [('name','=','Stock Lequile')])[0]
+        location_dest_id = self.pool.get('stock.location').search(cr, uid, [('name','=','Production')])[0]
+        
+        if not type:
+            return {'value': {
+                'location_id': False,
+                'location_dest_id': False
+                }
+            }
+        
+        if type == 'add':
+            #SI E' SCELTO DI AGGIUNGERE (SOSTITUIRE UN COMPONENTE), VERRA' PRELEVATO DAL MAGAZZINO CENTREALE (STOCK LEQUILE)
+            # E CARICATO NEL MAGAZZINO (produzione)
+            return {'value': {
+                'to_invoice': False,
+                'location_id': location_id,
+                'location_dest_id': location_dest_id,
+                }
+            }
+            #IN CASO DI SOLA RIMOZIONE DEL COMPONENTE DANNEGGIATO LO PRELEVO E LO RICARICO DA GARANZIA SEDE
+        else:
+            return {'value': {
+                'to_invoice': False,
+                'location_id': location_dest_id,
+                'location_dest_id': location_dest_id,                }
+                    
+            }
+            
+        
 
 mrp_repair_line()
